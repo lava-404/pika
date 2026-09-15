@@ -1,0 +1,11 @@
+Nyx PDF Test 
+This is a test document for the Nyx ingestion pipeline. 
+Nyx should: 
+1.​ Receive this PDF through the FastAPI upload endpoint. 
+2.​ Extract the text using PyMuPDF. 
+3.​ Split the extracted text into chunks. 
+4.​ Generate embeddings for each chunk. 
+5.​ Store the source and chunks in Supabase. 
+This document is only being used to test PDF ingestion. 
+ 
+
