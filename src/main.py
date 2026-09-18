@@ -1,15 +1,44 @@
 from fastapi import FastAPI, UploadFile, File
 import pymupdf
 import uuid
+import aio_pika
+from pydantic import BaseModel, HttpUrl, TypeAdapter
+import asyncio
+from urllib.parse import urljoin
 import os
+import httpx
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from supabase import create_client
 from sentence_transformers import SentenceTransformer
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Nyx")
 
-sources = {}
+app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.connection = await aio_pika.connect_robust(
+        "amqp://localhost/"
+    )
+
+    app.state.channel = await app.state.connection.channel()
+
+    # create/declare the queue
+    await app.state.channel.declare_queue("frontier_queue")
+
+    try:
+        yield
+    finally:
+        await app.state.connection.close()
+
+app = FastAPI(lifespan=lifespan)
+
+class Url(BaseModel):
+    url: HttpUrl
+
+app = FastAPI(title="Pika: Web Crawler")
 
 load_dotenv()
 
@@ -18,84 +47,38 @@ supabase = create_client(
     os.getenv("DATABASE_KEY")
 )
 
+async def worker():
+    connection = await aio_pika.connect_robust("amqp://localhost/")
+    channel = await connection.channel()
+    queue = await channel.declare_queue("frontier_queue")
+
+    async with httpx.AsyncClient() as client:
+        async with queue.iterator() as queue_iter:
+            async for message in queue_iter:
+                async with message.process():
+                    url = message.body.decode()
+
+                    response = await client.get(url)
+                    soup = BeautifulSoup(response.text, "lxml")
+
+                    for link in soup.find_all("a", href=True):
+                        absolute_url = urljoin(url, link["href"])
+                        new_url = Url(url=absolute_url)
+                        await push_link(new_url)
+asyncio.run(worker())
 
 @app.get("/")
 def health():
     return {"status": "ok"}
 
 
-@app.post("/upload")
-async def upload(
-    project_id: str,
-    file: UploadFile = File(...)
-):
-    sources[file.filename] = {
-        "content_type": file.content_type,
-        "size": file.size
-    }
-
-    # Generate UUID for the source
-    source_id = str(uuid.uuid4())
-
-    source_result = supabase.table("sources").insert({
-        "id": source_id,
-        "project_id": project_id,
-        "filename": file.filename,
-        "type": "pdf",
-        "storage_path": file.filename,
-        "status": "parsing"
-    }).execute()
-
-    # Read uploaded PDF
-    file_bytes = await file.read()
-
-    # Open PDF directly from memory
-    doc = pymupdf.open(
-        stream=file_bytes,
-        filetype="pdf"
+@app.post("/crawl/{url_link}")
+async def push_link(url: Url) -> dict:
+    #push the link into the queue
+    await app.state.channel.default_exchange.publish(
+        aio_pika.Message(body=str(url.url).encode()),
+        routing_key="frontier_queue"
     )
+    return {"status": "queued"}
 
-    # Extract text
-    out = open("output.txt", "wb")
 
-    for page in doc:
-        text = page.get_text().encode("utf8")
-        out.write(text)
-        out.write(bytes((12,)))
-
-    out.close()
-    doc.close()
-
-    # Read extracted text
-    with open("output.txt", "r") as output_file:
-      document = output_file.read()
-
-    # Split text into chunks
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=100,
-        chunk_overlap=0
-    )
-
-    texts = text_splitter.split_text(document)
-
-    # Load embedding model once
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-
-    # Generate and store chunks
-    for i, text in enumerate(texts):
-
-        # Generate UUID for chunk
-        chunk_id = str(uuid.uuid4())
-
-        # Generate embedding
-        embedding = model.encode(text).tolist()
-
-        chunks = supabase.table("chunks").insert({
-            "id": chunk_id,
-            "source_id": source_id,
-            "chunk_index": i,
-            "text": text,
-            "embedding": embedding
-        }).execute()
-
-    return sources[file.filename]
