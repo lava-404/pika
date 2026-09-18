@@ -1250,6 +1250,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "sentence-transformers" },
+    { name = "serpapi" },
     { name = "shortuuid" },
     { name = "supabase" },
     { name = "uvicorn" },
@@ -1264,6 +1265,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "sentence-transformers", specifier = ">=6.0.1" },
+    { name = "serpapi", specifier = ">=1.1.1" },
     { name = "shortuuid", specifier = ">=1.0.13" },
     { name = "supabase", specifier = ">=2.31.0" },
     { name = "uvicorn", specifier = ">=0.52.4" },
@@ -1876,6 +1878,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d9/ef/87681678d0aa91a1e77f0ffdd2e5d900aaf358aac644dd14bead8d95ec4c/sentence_transformers-6.0.1.tar.gz", hash = "sha256:1c3b8d9403f87ad0c879638554f36cc85744f38a6a70d150fd7e964ca0e9935b", size = 575395, upload-time = "2026-08-31T07:50:43.518Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/31/ab/dc6031faf1b6bba08076fbf457b21a5c51ba7928a77916915e093c16b8c7/sentence_transformers-6.0.1-py3-none-any.whl", hash = "sha256:b8888d72c707ba33c63aa30845850702dd5acadf1dd0d051436380bcebe4fd0f", size = 739832, upload-time = "2026-08-31T07:50:41.635Z" },
+]
+
+[[package]]
+name = "serpapi"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/10/04/0ddff4164197234a0f54f07a6407877b9379228b206e3cc1382b56f20e4f/serpapi-1.1.1.tar.gz", hash = "sha256:821c28a710599e14dfe0b7461e9615160671e6c6021e8b8ecefd59756dc3ede6", size = 75851, upload-time = "2026-09-08T13:35:06.607Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/2a/1835cc02fa36503e62ba198d67c7745661dcbfc4c67ffc28a61964e758ac/serpapi-1.1.1-py3-none-any.whl", hash = "sha256:ce0a5267db4d4721e24eb3df801cee428165740b72aeff5e2861aa9e9982c901", size = 11289, upload-time = "2026-09-08T13:35:05.301Z" },
 ]
 
 [[package]]

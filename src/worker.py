@@ -2,7 +2,8 @@
 import asyncio
 import os
 from urllib.parse import urljoin, urlparse
-
+from urllib.robotparser import RobotFileParser
+from urllib.parse import urljoin, urlparse
 import aio_pika
 import httpx
 from bs4 import BeautifulSoup
@@ -18,6 +19,7 @@ supabase = create_client(
     os.getenv("DATABASE_KEY")
 )
 
+robots_cache = {}
 
 class Url(BaseModel):
     url: HttpUrl
@@ -64,6 +66,10 @@ async def worker():
                         print("Already crawled, skipping:", url)
                         continue
 
+                    if not await can_crawl(url, client):
+                        print("Blocked by robots.txt:", url)
+                        continue
+
                     print("Crawling:", url)
 
                     response = await client.get(url)
@@ -91,6 +97,38 @@ async def worker():
                         new_url = Url(url=absolute_url)
 
                         await publish_url(new_url)
+
+
+async def can_crawl(url: str, client: httpx.AsyncClient) -> bool:
+    parsed = urlparse(url)
+
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    robots_url = f"{base_url}/robots.txt"
+
+    if base_url not in robots_cache:
+        try:
+            response = await client.get(robots_url)
+
+            if response.status_code >= 400:
+                # No accessible robots.txt
+                robots_cache[base_url] = None
+            else:
+                parser = RobotFileParser()
+                parser.set_url(robots_url)
+                parser.parse(response.text.splitlines())
+
+                robots_cache[base_url] = parser
+
+        except httpx.RequestError:
+            # If we can't retrieve robots.txt, be conservative
+            return False
+
+    parser = robots_cache[base_url]
+
+    if parser is None:
+        return True
+
+    return parser.can_fetch("*", url)
 
 if __name__ == "__main__":
     asyncio.run(worker())
